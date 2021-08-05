@@ -139,3 +139,39 @@ func (app *KVStoreApplication) Commit() abcitypes.ResponseCommit {
 	// Not sure what the Data is supposed to return
 	return abcitypes.ResponseCommit{Data: []byte{}}
 }
+
+
+// There are some nodes that won't run the application layer
+// e.g. light clients
+// A light client might still want to query information about
+// the application state machine, the query interface is used for this
+
+// Query checks if a key exists in the db
+// returns the existence status and the value if it does exist
+func (app *KVStoreApplication) Query(req abcitypes.RequestQuery) (res abcitypes.ResponseQuery) {
+	// Attach the key to the response
+	res.Key = req.Data
+	err := app.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(req.Data)
+		if err != nil && err != badger.ErrKeyNotFound {
+			return err
+		}
+		// If the key is not found attach the not found status
+		if err == badger.ErrKeyNotFound {
+			res.Log = "does not exist"
+		} else {
+			// Attach the value associated with the key
+			return item.Value(func(val []byte) error {
+				res.Log = "exists"
+				res.Value = val
+				return nil
+			})
+		}
+		return nil
+	})
+	// db error, panic
+	if err != nil {
+		panic(err)
+	}
+	return
+}
