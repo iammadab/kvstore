@@ -140,7 +140,6 @@ func (app *KVStoreApplication) Commit() abcitypes.ResponseCommit {
 	return abcitypes.ResponseCommit{Data: []byte{}}
 }
 
-
 // There are some nodes that won't run the application layer
 // e.g. light clients
 // A light client might still want to query information about
@@ -174,4 +173,34 @@ func (app *KVStoreApplication) Query(req abcitypes.RequestQuery) (res abcitypes.
 		panic(err)
 	}
 	return
+}
+
+// Satisfy the abci.Application interface
+
+func (KVStoreApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
+	return abcitypes.ResponseInfo{}
+}
+
+func (KVStoreApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
+	return abcitypes.ResponseInitChain{}
+}
+
+func (KVStoreApplication) ListSnapshots(abcitypes.RequestListSnapshots) abcitypes.ResponseListSnapshots {
+	return abcitypes.ResponseListSnapshots{}
+}
+
+func (KVStoreApplication) OfferSnapshot(abcitypes.RequestOfferSnapshot) abcitypes.ResponseOfferSnapshot {
+	return abcitypes.ResponseOfferSnapshot{}
+}
+
+func (KVStoreApplication) LoadSnapshotChunk(abcitypes.RequestLoadSnapshotChunk) abcitypes.ResponseLoadSnapshotChunk {
+	return abcitypes.ResponseLoadSnapshotChunk{}
+}
+
+func (KVStoreApplication) ApplySnapshotChunk(abcitypes.RequestApplySnapshotChunk) abcitypes.ResponseApplySnapshotChunk {
+	return abcitypes.ResponseApplySnapshotChunk{}
+}
+
+func (app *KVStoreApplication) SetOption(option abcitypes.RequestSetOption) abcitypes.ResponseSetOption {
+	return abcitypes.ResponseSetOption{}
 }
