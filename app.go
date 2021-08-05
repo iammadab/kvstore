@@ -14,7 +14,8 @@ import (
 const VALID_TX uint32 = 0
 
 type KVStoreApplication struct {
-	db *badger.DB
+	db           *badger.DB
+	currentBatch *badger.Txn
 }
 
 var _ abcitypes.Application = (*KVStoreApplication)(nil)
@@ -24,7 +25,6 @@ func NewKVStoreApplication(db *badger.DB) *KVStoreApplication {
 		db: db,
 	}
 }
-
 
 // When a peer gets a transaction from another peer, it has to confirm with
 // the application to determine if the transaction is valid
@@ -86,4 +86,56 @@ func (app *KVStoreApplication) isValid(tx []byte) (code uint32) {
 	}
 
 	return code
+}
+
+// Once tendermint core has reached consensus on a block it needs to be
+// communicated to the application
+// The ABCI interface for that is
+// BeginBlock -> signals that a new block has been committed to and transactions are coming
+// DeliverTx -> this is used to send each transaction in the block (sent per transaction)
+// EndBlock -> signals that all transactions for that block has been sent
+// CommitBlock -> Applies the transactions in the block to the state machine in order
+
+// BeginBlock opens a new write batch on badger db
+func (app *KVStoreApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
+	app.currentBatch = app.db.NewTransaction(true)
+	return abcitypes.ResponseBeginBlock{}
+}
+
+// DeliverTx validates the transaction again but also
+// applies the transaction to the state machine
+// returns a code to indicate if the transaction is valid
+// I am not sure what the tendermint core will do if the application says
+// that a transaction is not valid as a response to DeliverTx
+func (app *KVStoreApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
+	code := app.isValid(req.Tx)
+	if code != 0 {
+		return abcitypes.ResponseDeliverTx{Code: code}
+	}
+
+	parts := bytes.Split(req.Tx, []byte("="))
+	key, value := parts[0], parts[1]
+
+	// Add the key value pair to the current batch
+	// NOTE: There is a possibility that the current batch
+	// might get too big, how would this be handled
+	// since we can't commit yet???
+	err := app.currentBatch.Set(key, value)
+	if err != nil {
+		panic(err)
+	}
+
+	return abcitypes.ResponseDeliverTx{Code: VALID_TX}
+}
+
+// EndBlock doesn't really do anything for this application
+func (app *KVStoreApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
+	return abcitypes.ResponseEndBlock{}
+}
+
+// Commit persistence all the transactions for the current batch i.e current block
+func (app *KVStoreApplication) Commit() abcitypes.ResponseCommit {
+	app.currentBatch.Commit()
+	// Not sure what the Data is supposed to return
+	return abcitypes.ResponseCommit{Data: []byte{}}
 }
