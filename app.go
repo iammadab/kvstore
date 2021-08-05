@@ -6,6 +6,11 @@ import (
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
 
+// Tendermint core, handles network (peer communication) and consensus between peers
+// Application defines the state machine
+// The goal is to make sure the current state of the state machine is the same across
+// all correct nodes
+
 const VALID_TX uint32 = 0
 
 type KVStoreApplication struct {
@@ -20,10 +25,17 @@ func NewKVStoreApplication(db *badger.DB) *KVStoreApplication {
 	}
 }
 
-// There is the tendermint core, which handles network and consensus
-// Then there is the application which contains the state machine
-// ABCI defines the interface for communication between the two
-// Seems data is sent in the form of bytes i.e transactions are serialized to bytes
+
+// When a peer gets a transaction from another peer, it has to confirm with
+// the application to determine if the transaction is valid
+// if valid it adds it to the mempool, else it discards it
+
+// CheckTx weakly validates the transaction
+// i.e. validates the transaction without applying it to the state machine
+func (app *KVStoreApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
+	code := app.isValid(req.Tx)
+	return abcitypes.ResponseCheckTx{Code: code, GasWanted: 1}
+}
 
 // isValid validates that a transaction meets a set of constraints
 // in the case of this application, the constraint will be that
@@ -74,9 +86,4 @@ func (app *KVStoreApplication) isValid(tx []byte) (code uint32) {
 	}
 
 	return code
-}
-
-func (app *KVStoreApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
-	code := app.isValid(req.Tx)
-	return abcitypes.ResponseCheckTx{Code: code, GasWanted: 1}
 }
